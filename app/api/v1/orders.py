@@ -14,6 +14,7 @@ from app.schemas.order import OrderCreate, OrderResponse, WebhookPayload, AgentQ
 from app.services.redis_cache import cache_service
 from app.worker.tasks import send_order_confirmation_email, is_broker_reachable
 from app.services.agent_service import agent_service
+from app.core.limiter import limiter
 
 router = APIRouter(prefix="/orders", tags=["Orders & Billing"])
 
@@ -21,7 +22,8 @@ router = APIRouter(prefix="/orders", tags=["Orders & Billing"])
 # 1. CREATE ORDER (Database + Cache Pre-warm)
 # -------------------------------------------------------------
 @router.post("/", response_model=OrderResponse, status_code=status.HTTP_201_CREATED)
-async def create_order(payload: OrderCreate, db: AsyncSession = Depends(get_db)):
+@limiter.limit("30/minute")
+async def create_order(request: Request, payload: OrderCreate, db: AsyncSession = Depends(get_db)):
     """Creates a new order in DB and caches it immediately."""
     new_order_id = f"ord_{uuid.uuid4().hex[:8]}"
     
@@ -167,7 +169,8 @@ async def handle_payment_webhook(
 # 4. AGENTIC AI (ReAct Loop + Tool Calling)
 # -------------------------------------------------------------
 @router.post("/agent/execute", response_model=AgentActionResponse)
-async def execute_agent_workflow(query: AgentQueryRequest, db: AsyncSession = Depends(get_db)):
+@limiter.limit("15/minute")
+async def execute_agent_workflow(request: Request, query: AgentQueryRequest, db: AsyncSession = Depends(get_db)):
     """
     Enterprise Agentic AI ReAct Workflow (Groq Llama 3.3 70B):
     1. Autonomous natural language comprehension (supports Hinglish, colloquial, complex prompts).

@@ -1,4 +1,4 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
 
 class Settings(BaseSettings):
@@ -24,10 +24,11 @@ class Settings(BaseSettings):
     GROQ_API_KEY: str = Field(default="", description="Groq API key for Agentic AI")
     AI_MODEL: str = Field(default="openai/gpt-oss-120b", description="Fast inference LLM model")
 
-    class Config:
-        case_sensitive = True
-        env_file = ".env"
-        extra = "ignore"
+    model_config = SettingsConfigDict(
+        case_sensitive=True,
+        env_file=".env",
+        extra="ignore"
+    )
 
 # Global application settings instance
 settings = Settings()

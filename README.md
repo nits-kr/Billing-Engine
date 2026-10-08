@@ -8,6 +8,8 @@
 [![Celery](https://img.shields.io/badge/Celery-Distributed%20Worker-37814A?style=flat&logo=celery&logoColor=white)](https://docs.celeryq.dev/)
 [![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-2.0%20Async-D71F00?style=flat&logo=sqlalchemy&logoColor=white)](https://www.sqlalchemy.org/)
 [![Groq](https://img.shields.io/badge/Groq-Llama%203.3%2070B%20Agent-F55036?style=flat)](https://groq.com/)
+[![CI](https://github.com/nits-kr/Billing-Engine/actions/workflows/ci.yml/badge.svg)](https://github.com/nits-kr/Billing-Engine/actions)
+[![Docker](https://img.shields.io/badge/Docker-Compose%20Ready-2496ED?style=flat&logo=docker&logoColor=white)](https://www.docker.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ---
@@ -129,7 +131,15 @@ REDIS_URL=redis://localhost:6379/0
 STRIPE_WEBHOOK_SECRET=whsec_sample_secret_key_123
 ```
 
-### 3. Run the Microservice
+### 3. Run with Docker Compose (Recommended)
+
+Spin up the entire microservice stack (FastAPI + Redis + Celery Worker) with one command:
+
+```bash
+docker compose up --build
+```
+
+### 4. Or Run Locally via Uvicorn
 
 ```bash
 uvicorn main:app --reload
@@ -137,6 +147,16 @@ uvicorn main:app --reload
 
 Server will start at: `http://127.0.0.1:8000`  
 Interactive Swagger UI: **`http://127.0.0.1:8000/docs`**
+
+---
+
+## 🧪 Automated Testing
+
+Run the full end-to-end asynchronous test suite verifying CRUD, Webhook Idempotency, and Agent workflows:
+
+```bash
+pytest tests/ -v
+```
 
 ---
 

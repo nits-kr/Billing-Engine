@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  # 1. FastAPI Application Service
+  web:
+    build: .
+    container_name: billing_engine_api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=sqlite+aiosqlite:///./enterprise_app.db
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  # 2. Redis In-Memory Cache & Message Broker
+  redis:
+    image: redis:7.2-alpine
+    container_name: billing_engine_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # 3. Celery Background Worker
+  celery_worker:
+    build: .
+    container_name: billing_engine_worker
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=sqlite+aiosqlite:///./enterprise_app.db
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    command: celery -A app.worker.tasks.celery_app worker --loglevel=info --concurrency=2
+
+volumes:
+  redis_data:
+    driver: local
