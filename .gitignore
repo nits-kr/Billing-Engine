@@ -1,0 +1,42 @@
+# Environment variables & API Keys (CRITICAL: NEVER COMMIT SECRETS)
+.env
+.env.local
+*.env
+
+# Python Bytecode & Cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+
+# Virtual Environment
+venv/
+.venv/
+env/
+ENV/
+
+# Database
+*.db
+*.sqlite3
+enterprise_app.db
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# Logs
+*.log
+logs/
+
+# IDE & Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Private Notes & Interview Prep
+interview_prep/
