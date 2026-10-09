@@ -121,14 +121,30 @@ async def handle_payment_webhook(
     order_id = payload.data.get("order_id")
 
     # Step 2: Idempotency Enforcement (Prevents duplicate processing)
+    stmt_check = select(ProcessedWebhook).where(ProcessedWebhook.event_id == event_id)
+    check_res = await db.execute(stmt_check)
+    existing_entry = check_res.scalar_one_or_none()
+
+    if existing_entry:
+        return {
+            "status": "ignored",
+            "reason": "duplicate_event_already_processed",
+            "event_id": event_id,
+            "previously_processed_at": str(existing_entry.processed_at)
+        }
+
+    # Record new event in idempotency ledger
     processed_entry = ProcessedWebhook(event_id=event_id, event_type=event_type)
     db.add(processed_entry)
     try:
-        await db.commit()  # Unique constraint violation raises IntegrityError on duplicates
+        await db.commit()
     except IntegrityError:
         await db.rollback()
-        # Duplicate event detected: Return 200 OK immediately to satisfy webhook retry contract
-        return {"status": "ignored", "reason": "duplicate_event_already_processed"}
+        return {
+            "status": "ignored",
+            "reason": "duplicate_event_already_processed",
+            "event_id": event_id
+        }
 
     # Step 3: Fulfill Order & Invalidate Cache
     if event_type == "payment.succeeded" and order_id:
