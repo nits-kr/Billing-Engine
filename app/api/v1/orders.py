@@ -116,7 +116,7 @@ async def handle_payment_webhook(
 
     # In strict mode: if not hmac.compare_digest(computed_sig, x_signature): raise 400
 
-    event_id = payload.event_id
+    event_id = payload.event_id.strip() if (payload.event_id and payload.event_id.strip()) else f"evt_{uuid.uuid4().hex[:8]}"
     event_type = payload.type
     order_id = payload.data.get("order_id")
 

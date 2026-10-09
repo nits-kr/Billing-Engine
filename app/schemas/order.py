@@ -20,8 +20,12 @@ class OrderResponse(BaseModel):
 
 # 3. WebhookPayload: Inbound payment gateway webhook contract
 class WebhookPayload(BaseModel):
-    event_id: str = Field(..., examples=["evt_test_12345"])
-    type: str = Field(..., examples=["payment.succeeded"])
+    event_id: Optional[str] = Field(
+        default=None,
+        description="Unique Stripe Event ID (e.g. evt_xxx). If omitted, an auto-generated unique event ID is assigned.",
+        examples=["evt_test_unique_01"]
+    )
+    type: str = Field(default="payment.succeeded", examples=["payment.succeeded"])
     data: Dict[str, Any]
 
 # 4. Agentic AI Schemas: Natural Language Prompt aur Tool-calling result
