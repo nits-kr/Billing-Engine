@@ -42,7 +42,8 @@ async def create_order(request: Request, payload: OrderCreate, db: AsyncSession 
         "order_id": new_order.order_id,
         "user_email": new_order.user_email,
         "amount_cents": new_order.amount_cents,
-        "status": new_order.status
+        "status": new_order.status,
+        "created_at": new_order.created_at.isoformat() if new_order.created_at else None
     }
     await cache_service.set_cache(f"order:{new_order_id}", order_dict, ttl_seconds=300)
 
@@ -80,7 +81,8 @@ async def get_order_by_id(order_id: str, db: AsyncSession = Depends(get_db)):
         "order_id": order.order_id,
         "user_email": order.user_email,
         "amount_cents": order.amount_cents,
-        "status": order.status
+        "status": order.status,
+        "created_at": order.created_at.isoformat() if order.created_at else None
     }
     await cache_service.set_cache(cache_key, order_data, ttl_seconds=300)
 
@@ -147,38 +149,49 @@ async def handle_payment_webhook(
         }
 
     # Step 3: Fulfill Order & Invalidate Cache
+    order_status = "not_found"
     if event_type == "payment.succeeded" and order_id:
         stmt = select(Order).where(Order.order_id == order_id)
         res = await db.execute(stmt)
         order = res.scalar_one_or_none()
 
         if order:
-            order.status = "paid"
-            await db.commit()
+            if order.status in ["refunded", "cancelled"]:
+                # Guard against race conditions: do not revert refunded/cancelled orders back to paid
+                order_status = order.status
+            else:
+                order.status = "paid"
+                await db.commit()
+                order_status = "paid"
 
-            # Cache Invalidation: Delete stale pending cache from Redis
-            await cache_service.delete_cache(f"order:{order_id}")
+                # Cache Invalidation: Delete stale pending cache from Redis
+                await cache_service.delete_cache(f"order:{order_id}")
 
-            # Step 4: Dispatch Celery Worker via background_tasks (Zero HTTP latency!)
-            def _dispatch_worker(email: str, ord_id: str, amount: int):
-                try:
-                    if is_broker_reachable():
-                        send_order_confirmation_email.delay(
-                            user_email=email,
-                            order_id=ord_id,
-                            amount_cents=amount
-                        )
-                except Exception:
-                    pass
+                # Step 4: Dispatch Celery Worker via background_tasks (Zero HTTP latency!)
+                def _dispatch_worker(email: str, ord_id: str, amount: int):
+                    try:
+                        if is_broker_reachable():
+                            send_order_confirmation_email.delay(
+                                user_email=email,
+                                order_id=ord_id,
+                                amount_cents=amount
+                            )
+                    except Exception:
+                        pass
 
-            background_tasks.add_task(
-                _dispatch_worker,
-                email=order.user_email,
-                ord_id=order.order_id,
-                amount=order.amount_cents
-            )
+                background_tasks.add_task(
+                    _dispatch_worker,
+                    email=order.user_email,
+                    ord_id=order.order_id,
+                    amount=order.amount_cents
+                )
 
-    return {"status": "success", "event_id": event_id}
+    return {
+        "status": "success",
+        "event_id": event_id,
+        "order_id": order_id,
+        "order_status": order_status
+    }
 
 
 # -------------------------------------------------------------

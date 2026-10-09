@@ -6,9 +6,14 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-def is_broker_reachable(host: str = "127.0.0.1", port: int = 6379, timeout: float = 0.1) -> bool:
+from urllib.parse import urlparse
+
+def is_broker_reachable(timeout: float = 0.1) -> bool:
     """Fast network health check before dispatching Celery tasks."""
     try:
+        parsed = urlparse(settings.REDIS_URL)
+        host = parsed.hostname or "127.0.0.1"
+        port = parsed.port or 6379
         with socket.create_connection((host, port), timeout=timeout):
             return True
     except Exception:

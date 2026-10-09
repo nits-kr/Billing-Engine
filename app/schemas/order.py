@@ -22,11 +22,23 @@ class OrderResponse(BaseModel):
 class WebhookPayload(BaseModel):
     event_id: Optional[str] = Field(
         default=None,
-        description="Unique Stripe Event ID (e.g. evt_xxx). If omitted, an auto-generated unique event ID is assigned.",
-        examples=["evt_test_unique_01"]
+        description="Unique Stripe Event ID (e.g. evt_xxx). Leave blank or omit to auto-generate a fresh unique ID."
     )
-    type: str = Field(default="payment.succeeded", examples=["payment.succeeded"])
-    data: Dict[str, Any]
+    type: str = Field(default="payment.succeeded", description="Event type emitted by payment provider")
+    data: Dict[str, Any] = Field(
+        description="Payload data containing order_id (e.g. {'order_id': 'ord_12345678'})"
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "type": "payment.succeeded",
+                "data": {
+                    "order_id": "ord_paste_your_order_id_here"
+                }
+            }
+        }
+    }
 
 # 4. Agentic AI Schemas: Natural Language Prompt aur Tool-calling result
 class AgentQueryRequest(BaseModel):

@@ -73,7 +73,14 @@ async def execute_query_order_status(db: AsyncSession, order_id: str) -> Dict[st
     # 1. Check Redis cache first
     cached = await cache_service.get_cache(f"order:{order_id}")
     if cached:
-        return {"source": "cache", "order_id": order_id, "status": cached.get("status"), "amount_cents": cached.get("amount_cents")}
+        return {
+            "source": "cache",
+            "order_id": order_id,
+            "user_email": cached.get("user_email"),
+            "amount_cents": cached.get("amount_cents"),
+            "status": cached.get("status"),
+            "created_at": cached.get("created_at")
+        }
 
     # 2. Query DB
     stmt = select(Order).where(Order.order_id == order_id)
@@ -106,6 +113,21 @@ async def execute_process_order_refund(db: AsyncSession, order_id: str, reason: 
             "status": "already_refunded",
             "order_id": order_id,
             "message": "Order was already refunded previously."
+        }
+
+    if order.status == "pending":
+        # Cannot refund an unpaid order; mark as cancelled instead
+        order.status = "cancelled"
+        await db.commit()
+        await db.refresh(order)
+        await cache_service.delete_cache(f"order:{order_id}")
+        return {
+            "success": True,
+            "order_id": order_id,
+            "amount_cents": order.amount_cents,
+            "status": "cancelled",
+            "message": "Order was pending payment and had not been charged. The order has been cancelled instead of refunded.",
+            "reason_recorded": reason
         }
 
     # Update status to refunded (ACID transaction)
@@ -229,7 +251,7 @@ class AgentService:
         """Deterministic fallback if external LLM network is down."""
         text = prompt.lower()
         words = text.split()
-        target_id = next((w for w in words if w.startswith("ord_")), "ord_sample")
+        target_id = next((w.strip(".,!?:;'\"()") for w in words if w.strip(".,!?:;'\"()").startswith("ord_")), "ord_sample")
 
         if "refund" in text or "reverse" in text or "cancel" in text:
             result = await execute_process_order_refund(db, target_id, reason="Customer fallback request")
